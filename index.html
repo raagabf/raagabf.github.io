@@ -5,26 +5,79 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Raaga</title>
 <meta name="theme-color" content="#e2621b">
-<!-- Adresse fixe de Raaga : renvoie vers le lien du moment (mis à jour automatiquement) -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Raaga">
+<!-- Adresse fixe de Raaga : renvoie vers le lien du moment (mis à jour automatiquement).
+     Avec « ?installer » : page pour installer Raaga sur l'écran d'accueil ; l'icône repasse toujours par ici. -->
 <script>
   var RAAGA = 'https://expenditure-bow-sys-configured.trycloudflare.com';
-  location.replace(RAAGA + location.search + location.hash);
+  var params = new URLSearchParams(location.search);
+  var standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  var installer = params.has('installer') && !standalone;
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
+  if (!installer) {
+    // On garde les autres paramètres (ex. ?invite=CODE) et la page demandée (#/produit/12…)
+    var q = new URLSearchParams(location.search);
+    q.delete('installer');
+    if (q.has('app')) { q.delete('app'); q.set('source', 'app'); }
+    location.replace(RAAGA + '/' + (String(q) ? '?' + q : '') + location.hash);
+  }
 </script>
 <style>
+  * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f6f2ec; color: #1f1a14; }
-  .box { text-align: center; padding: 24px; }
-  .logo { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg, #f0a040, #e2621b); color: #fff; font-size: 34px; font-weight: 800; }
-  a { display: inline-block; margin-top: 16px; padding: 12px 22px; border-radius: 999px; background: #e2621b; color: #fff; font-weight: 700; text-decoration: none; }
-  p { color: #776d62; }
+  .box { text-align: center; padding: 24px 18px; max-width: 420px; width: 100%; }
+  .logo { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(135deg, #f0a040, #e2621b); color: #fff; font-size: 38px; font-weight: 800; box-shadow: 0 8px 20px rgba(226, 98, 27, .3); }
+  h1 { margin: 12px 0 4px; }
+  p { color: #776d62; line-height: 1.45; }
+  .btn { display: block; width: 100%; margin-top: 12px; padding: 14px 22px; border: 0; border-radius: 999px; background: #e2621b; color: #fff; font-weight: 700; font-size: 16px; text-decoration: none; cursor: pointer; }
+  .btn.light { background: #fff; color: #1f1a14; border: 1px solid #e6e0d8; }
+  .steps { text-align: left; background: #fff; border: 1px solid #e6e0d8; border-radius: 16px; padding: 14px 16px; margin-top: 14px; line-height: 1.9; }
+  .steps b { color: #e2621b; }
+  .hidden { display: none; }
 </style>
 </head>
 <body>
   <div class="box">
     <div class="logo">R</div>
     <h1>Raaga</h1>
-    <p>Ouverture de Raaga…</p>
-    <a href="https://expenditure-bow-sys-configured.trycloudflare.com">Ouvrir Raaga</a>
-    <p style="font-size:13px">Si la page ne s'ouvre pas, Raaga est peut-être en maintenance : réessayez dans quelques minutes.</p>
+    <div id="loading"><p>Ouverture de Raaga…</p><a class="btn" href="https://expenditure-bow-sys-configured.trycloudflare.com">Ouvrir Raaga</a>
+      <p style="font-size:13px">Si la page ne s'ouvre pas, Raaga est peut-être en maintenance : réessayez dans quelques minutes.</p></div>
+
+    <div id="install" class="hidden">
+      <p>Installez Raaga sur votre écran d'accueil : <b>l'icône marchera toujours</b>, même quand Raaga change d'adresse.</p>
+      <button class="btn hidden" id="go">📲 Installer Raaga</button>
+      <div class="steps hidden" id="ios">Sur iPhone (Safari) :<br>1. Touchez <b>Partager</b> ⬆️ en bas de l'écran<br>2. Choisissez <b>« Sur l'écran d'accueil »</b><br>3. Touchez <b>Ajouter</b></div>
+      <div class="steps hidden" id="android">Sur Android (Chrome) :<br>1. Touchez le menu <b>⋮</b> en haut à droite<br>2. Choisissez <b>« Installer l'application »</b> ou <b>« Ajouter à l'écran d'accueil »</b></div>
+      <p id="done" class="hidden">✅ Raaga est installé : ouvrez-le depuis votre écran d'accueil.</p>
+      <a class="btn light" href="https://expenditure-bow-sys-configured.trycloudflare.com">Ouvrir Raaga sans installer</a>
+    </div>
   </div>
+<script>
+  if (installer) {
+    document.getElementById('loading').className = 'hidden';
+    document.getElementById('install').className = '';
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var go = document.getElementById('go');
+    if (ios) document.getElementById('ios').className = 'steps';
+    else document.getElementById('android').className = 'steps';
+    var prompt = null;
+    addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      prompt = e;
+      go.className = 'btn';
+      document.getElementById('android').className = 'steps hidden';
+    });
+    go.onclick = function () { if (prompt) { prompt.prompt(); prompt = null; } };
+    addEventListener('appinstalled', function () {
+      go.className = 'btn hidden';
+      document.getElementById('done').className = '';
+    });
+  }
+</script>
 </body>
 </html>
